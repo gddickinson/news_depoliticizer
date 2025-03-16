@@ -3,3 +3,4 @@ llm_processing.log
 processed_news/depoliticized_news_20250316_150352.json
 *.json
 Depoliticized News.pdf
+.DS_Store

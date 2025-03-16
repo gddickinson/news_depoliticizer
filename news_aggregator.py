@@ -197,15 +197,35 @@ class NewsAggregator:
         for group in story_groups:
             # Combine content from all articles in the group
             combined_content = ""
+            source_details = []
+            
             for article in group['articles']:
                 content = article.get('content', article.get('description', ''))
                 if content:
                     combined_content += content + "\n\n"
+                
+                # Get more detailed source information when available
+                source_name = article.get('source_name', 'unknown')
+                if source_name == 'newsapi' and article.get('source', {}).get('name'):
+                    # If we have the actual publication name from NewsAPI, use it
+                    detailed_source = article['source']['name']
+                    source_details.append(detailed_source)
+                elif source_name not in ['unknown', 'newsapi']:
+                    source_details.append(source_name)
+            
+            # If we don't have detailed sources, use the original sources list
+            if not source_details:
+                source_details = group['sources']
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_sources = [x for x in source_details if not (x in seen or seen.add(x))]
             
             llm_data = {
                 'title': group['main_title'],
                 'content': combined_content,
-                'sources': group['sources'],
+                'sources': unique_sources,  # Use more detailed source names
+                'original_sources': group['sources'],  # Keep original sources as backup
                 'importance_rank': len(story_groups) - story_groups.index(group),
                 'total_sources': len(group['sources'])
             }

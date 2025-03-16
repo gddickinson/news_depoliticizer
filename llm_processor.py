@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import re
 from datetime import datetime
 import time
 from pathlib import Path
@@ -250,6 +251,10 @@ Number of Sources: {news_item['total_sources']}
 4. Use neutral, objective language.
 5. Structure the article with the most important information first.
 6. Keep approximately the same length as the original.
+7. IMPORTANT: Write directly in news format. Do NOT start with phrases like "Here is a rewritten version..." or "Title:". 
+8. Begin immediately with the news content as if you are a professional news outlet.
+9. Do not include meta-commentary, notes to the reader, or any text that explains what you're doing.
+10. Do not end with phrases like "(Note: I've kept the article...)" or similar meta-commentary.
 </instructions>
 
 <rewritten_article>
@@ -277,6 +282,10 @@ Number of Sources: {news_item['total_sources']}
 4. Use neutral, objective language.
 5. Structure the article with the most important information first.
 6. Keep approximately the same length as the original.
+7. IMPORTANT: Write directly in news format. Do NOT start with phrases like "Here is a rewritten version..." or "Title:". 
+8. Begin immediately with the news content as if you are a professional news outlet.
+9. Do not include meta-commentary, notes to the reader, or any text that explains what you're doing.
+10. Do not end with phrases like "(Note: I've kept the article...)" or similar meta-commentary.
 
 Respond with only the rewritten article text.
 </TASK>
@@ -284,6 +293,45 @@ Respond with only the rewritten article text.
 <REWRITTEN_ARTICLE>
 """
     
+    def clean_llm_output(self, text):
+        """Clean up common LLM artifacts from the output"""
+        if not text:
+            return ""
+            
+        # Remove common LLM artifacts
+        patterns = [
+            # Remove "Here is a rewritten version" intros
+            r"^Here is (?:a |the )?rewritten version(?: of the news story| of this article| that maintains all factual information)?.*?\n",
+            
+            # Remove "Title:" prefixes
+            r"^Title:.*?\n",
+            
+            # Remove notes and comments
+            r"\(Note:.*?\)",
+            r"\(Factual information.*?\)",
+            r"\(I've kept the article.*?\)",
+            
+            # Remove meta-commentary
+            r"I have maintained the original.*?\n",
+            r"This rewritten version.*?\n",
+            r"All factual information has been.*?\n",
+            
+            # Remove "Rewritten Article:" headers
+            r"^Rewritten Article:.*?\n",
+            
+            # Clean up any other common patterns
+            r"In this rewritten version,.*?\n",
+        ]
+        
+        for pattern in patterns:
+            text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Also clean up any extra whitespace
+        text = re.sub(r'\n\s*\n', '\n\n', text)  # Replace multiple newlines with just two
+        text = text.strip()  # Remove leading/trailing whitespace
+        
+        return text
+
     def process_news_data(self, input_file="llm_input_data.json", output_dir="processed_news"):
         """Process all news items and rewrite them using the LLM"""
         # Create output directory if it doesn't exist
@@ -311,6 +359,9 @@ Respond with only the rewritten article text.
                 
                 # Generate rewritten article
                 rewritten = self.generate_response(prompt)
+                
+                # Clean up the output to remove common LLM artifacts
+                rewritten = self.clean_llm_output(rewritten)
                 
                 # Save processed item
                 processed_item = {
